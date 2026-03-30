@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LOCKED IN — HB 959 Escape Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080c10;
+  --bg2: #0d1118;
+  --surface: #131920;
+  --surface2: #1a2230;
+  --border: rgba(255,255,255,0.07);
+  --text: #dde4f0;
+  --muted: #6b7a94;
+  --r1: #ef4444; --r1l: rgba(239,68,68,0.1);
+  --r2: #f97316; --r2l: rgba(249,115,22,0.1);
+  --r3: #a855f7; --r3l: rgba(168,85,247,0.1);
+  --r4: #3b82f6; --r4l: rgba(59,130,246,0.1);
+  --r5: #10b981; --r5l: rgba(16,185,129,0.1);
+  --r6: #eab308; --r6l: rgba(234,179,8,0.1);
+  --gold: #fbbf24;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Space Grotesk',sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+}
+
+/* SCANLINE TEXTURE */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+/* TOP HUD */
+#hud{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(8,12,16,0.95);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.5rem;height:50px;
+}
+.hud-title{
+  font-family:'Bebas Neue',sans-serif;font-size:1.2rem;
+  letter-spacing:0.1em;color:var(--text);
+}
+.hud-title span{color:var(--gold);}
+.lock-track{display:flex;gap:5px;align-items:center;}
+.lock-pip{
+  width:28px;height:8px;border-radius:4px;
+  background:var(--surface2);border:1px solid var(--border);
+  transition:all 0.4s ease;
+}
+.lock-pip.unlocked{border-color:transparent;}
+.lock-pip[data-r="1"].unlocked{background:var(--r1);}
+.lock-pip[data-r="2"].unlocked{background:var(--r2);}
+.lock-pip[data-r="3"].unlocked{background:var(--r3);}
+.lock-pip[data-r="4"].unlocked{background:var(--r4);}
+.lock-pip[data-r="5"].unlocked{background:var(--r5);}
+.lock-pip[data-r="6"].unlocked{background:var(--r6);}
+.hud-escape{
+  font-size:0.75rem;color:var(--muted);
+  font-family:'Space Mono',monospace;
+}
+#rooms-left{color:var(--gold);font-weight:700;}
+
+/* SCREENS */
+.screen{display:none;min-height:100vh;padding:70px 0 4rem;}
+.screen.active{display:block;animation:fadeUp 0.5s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* INTRO */
+#intro{
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;text-align:center;
+  background:radial-gradient(ellipse at center,rgba(239,68,68,0.06) 0%,transparent 70%);
+}
+.intro-badge{
+  font-family:'Space Mono',monospace;font-size:0.7rem;
+  letter-spacing:0.2em;text-transform:uppercase;
+  color:var(--r1);border:1px solid rgba(239,68,68,0.3);
+  padding:0.4rem 1rem;border-radius:4px;margin-bottom:2rem;
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+.intro-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(4rem,12vw,9rem);
+  line-height:0.9;letter-spacing:0.02em;
+  color:var(--text);margin-bottom:0.5rem;
+}
+.intro-title .red{color:var(--r1);}
+.intro-subtitle{
+  font-size:1.1rem;color:var(--muted);
+  max-width:480px;margin:1.5rem auto;
+  line-height:1.7;font-weight:300;
+}
+.intro-rules{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:1rem;max-width:580px;margin:2rem auto;
+}
+.rule-pill{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:0.8rem;font-size:0.8rem;
+  color:var(--muted);line-height:1.4;
+}
+.rule-pill strong{display:block;color:var(--text);margin-bottom:2px;}
+.btn-start{
+  font-family:'Bebas Neue',sans-serif;font-size:1.4rem;
+  letter-spacing:0.1em;padding:1rem 3rem;
+  background:var(--r1);color:white;border:none;
+  border-radius:6px;cursor:pointer;transition:all 0.2s;
+  box-shadow:0 0 30px rgba(239,68,68,0.3);margin-top:1rem;
+}
+.btn-start:hover{transform:scale(1.04);box-shadow:0 0 50px rgba(239,68,68,0.5);}
+
+/* ROOM WRAPPER */
+.room{display:none;padding:0 1rem;}
+.room.active{display:block;}
+.room-container{max-width:720px;margin:0 auto;}
+
+/* ROOM HEADER */
+.room-header{
+  text-align:center;padding:3rem 1rem 2rem;
+  position:relative;
+}
+.room-number{
+  font-family:'Space Mono',monospace;font-size:0.72rem;
+  letter-spacing:0.2em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:0.8rem;
+}
+.room-icon{font-size:3rem;margin-bottom:0.8rem;display:block;}
+.room-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(2.5rem,7vw,4.5rem);
+  line-height:0.95;letter-spacing:0.02em;
+  margin-bottom:1rem;
+}
+.room-premise{
+  font-size:0.95rem;color:var(--muted);
+  max-width:560px;margin:0 auto;line-height:1.7;
+  font-weight:300;
+}
+
+/* LOCK DISPLAY */
+.lock-display{
+  display:flex;align-items:center;justify-content:center;
+  gap:1rem;margin:2rem 0;
+}
+.lock-icon{
+  font-size:2.5rem;transition:all 0.5s ease;
+  filter:grayscale(0.3);
+}
+.lock-icon.open{
+  animation:lockOpen 0.6s ease forwards;
+}
+@keyframes lockOpen{
+  0%{transform:scale(1)}
+  30%{transform:scale(1.3) rotate(-10deg)}
+  60%{transform:scale(1.2) rotate(5deg)}
+  100%{transform:scale(1)}
+}
+.lock-label{
+  font-family:'Space Mono',monospace;font-size:0.8rem;
+  color:var(--muted);letter-spacing:0.05em;
+}
+
+/* PUZZLE CARDS */
+.puzzle-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:1.8rem;margin-bottom:1.2rem;
+}
+.puzzle-instruction{
+  font-size:0.85rem;font-family:'Space Mono',monospace;
+  letter-spacing:0.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:1.2rem;
+}
+.puzzle-q{
+  font-size:1.05rem;font-weight:500;
+  line-height:1.5;margin-bottom:1.3rem;
+}
+.options{display:flex;flex-direction:column;gap:0.6rem;}
+.opt{
+  background:var(--surface2);border:2px solid var(--border);
+  border-radius:8px;padding:0.85rem 1.1rem;
+  cursor:pointer;font-size:0.93rem;text-align:left;
+  color:var(--text);font-family:'Space Grotesk',sans-serif;
+  transition:all 0.18s;
+}
+.opt:hover:not(:disabled){border-color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);}
+.opt.correct{border-color:var(--r5)!important;background:rgba(16,185,129,0.12)!important;color:var(--r5)!important;}
+.opt.wrong{border-color:var(--r1)!important;background:rgba(239,68,68,0.08)!important;color:var(--r1)!important;}
+.opt:disabled{cursor:not-allowed;}
+
+/* FEEDBACK */
+.feedback{
+  border-radius:8px;padding:0.9rem 1.1rem;
+  font-size:0.88rem;line-height:1.6;margin-top:0.8rem;
+  display:none;
+}
+.feedback.show{display:block;animation:fadeUp 0.25s ease;}
+.fb-good{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);color:var(--r5);}
+.fb-bad{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--r1);}
+
+/* SORT GAME (Room 2) */
+.sort-items{display:flex;flex-direction:column;gap:0.7rem;margin-bottom:1.2rem;}
+.sort-item{
+  background:var(--surface2);border:2px solid var(--border);
+  border-radius:8px;padding:0.9rem 1.1rem;
+  font-size:0.9rem;line-height:1.4;
+}
+.sort-btns{display:flex;gap:0.5rem;margin-top:0.6rem;}
+.sort-btn{
+  flex:1;padding:0.4rem;border-radius:6px;border:1px solid;
+  cursor:pointer;font-size:0.78rem;font-weight:600;
+  letter-spacing:0.05em;transition:all 0.18s;
+  font-family:'Space Mono',monospace;
+}
+.sort-btn-real{
+  border-color:rgba(16,185,129,0.4);color:var(--r5);
+  background:rgba(16,185,129,0.08);
+}
+.sort-btn-fake{
+  border-color:rgba(239,68,68,0.4);color:var(--r1);
+  background:rgba(239,68,68,0.06);
+}
+.sort-btn:hover:not(:disabled){opacity:0.8;}
+.sort-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.sort-item.marked-real{border-color:var(--r5);background:rgba(16,185,129,0.08);}
+.sort-item.marked-fake{border-color:var(--r1);background:rgba(239,68,68,0.08);}
+.sort-item.correct-mark{border-color:var(--r5);}
+.sort-item.wrong-mark{border-color:var(--r1);}
+.score-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.7rem 1rem;background:var(--surface2);
+  border-radius:8px;margin-bottom:1rem;
+  font-family:'Space Mono',monospace;font-size:0.8rem;
+}
+
+/* SPOT GAME (Room 3) */
+.app-mock{
+  background:#1c1c2e;border:2px solid rgba(168,85,247,0.2);
+  border-radius:14px;overflow:hidden;margin-bottom:1.2rem;
+  position:relative;
+}
+.app-topbar{
+  background:#252538;padding:0.6rem 1rem;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.app-logo{font-weight:700;font-size:0.9rem;color:#a78bfa;}
+.notif-badge{
+  background:var(--r1);color:white;font-size:0.7rem;font-weight:700;
+  border-radius:50%;width:18px;height:18px;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.app-content{padding:1rem;}
+.trap-expose-btn {
+  background: rgba(168,85,247,0.12);
+  border: 1.5px solid rgba(168,85,247,0.35);
+  color: var(--r3);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.trap-expose-btn:hover:not(:disabled) {
+  background: rgba(168,85,247,0.25);
+  border-color: var(--r3);
+}
+.trap-expose-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+.trap-result {
+  margin-top: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 7px;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  display: none;
+}
+.trap-result.show { display: block; animation: fadeUp 0.25s ease; }
+.trap-correct { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); color: #c084fc; }
+.trap-wrong   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--r1); }
+
+.trap{
+  cursor:pointer;border-radius:6px;
+  transition:all 0.2s;position:relative;
+}
+.trap:hover{outline:2px dashed rgba(168,85,247,0.5);}
+.trap.found{
+  outline:2px solid var(--r3)!important;
+  background:rgba(168,85,247,0.15)!important;
+}
+.trap.found::after{
+  content:'✓ FOUND';position:absolute;top:2px;right:4px;
+  font-size:0.6rem;color:var(--r3);font-weight:700;
+  font-family:'Space Mono',monospace;
+}
+.traps-found{
+  font-family:'Space Mono',monospace;font-size:0.82rem;
+  color:var(--muted);text-align:center;margin-bottom:0.8rem;
+}
+.traps-found span{color:var(--r3);font-weight:700;}
+
+/* TF GAME (Room 4) */
+.tf-q{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:1.1rem 1.3rem;margin-bottom:0.8rem;
+}
+.tf-statement{font-size:0.95rem;line-height:1.5;margin-bottom:0.8rem;}
+.tf-btns{display:flex;gap:0.6rem;}
+.tf-btn{
+  flex:1;padding:0.55rem;border-radius:7px;
+  border:1.5px solid var(--border);cursor:pointer;
+  font-family:'Space Mono',monospace;font-size:0.8rem;
+  font-weight:700;letter-spacing:0.05em;
+  background:var(--surface);color:var(--text);
+  transition:all 0.18s;
+}
+.tf-btn:hover:not(:disabled){border-color:rgba(255,255,255,0.2);}
+.tf-btn:disabled{cursor:not-allowed;}
+.tf-btn.true-btn.correct{background:rgba(16,185,129,0.15);border-color:var(--r5);color:var(--r5);}
+.tf-btn.false-btn.correct{background:rgba(16,185,129,0.15);border-color:var(--r5);color:var(--r5);}
+.tf-btn.wrong{background:rgba(239,68,68,0.1);border-color:var(--r1);color:var(--r1);}
+.tf-result{font-size:0.8rem;margin-top:0.5rem;display:none;}
+.tf-result.show{display:block;}
+
+/* PHISH GAME (Room 5) */
+.message-card{
+  background:var(--surface2);border:2px solid var(--border);
+  border-radius:10px;margin-bottom:0.9rem;overflow:hidden;
+  cursor:pointer;transition:all 0.2s;
+}
+.message-card:hover{border-color:rgba(255,255,255,0.15);}
+.msg-header{
+  background:var(--surface);padding:0.6rem 1rem;
+  display:flex;justify-content:space-between;
+  font-family:'Space Mono',monospace;font-size:0.75rem;
+  color:var(--muted);border-bottom:1px solid var(--border);
+}
+.msg-body{padding:1rem;font-size:0.9rem;line-height:1.6;}
+.msg-flag-btn{
+  width:100%;padding:0.6rem;
+  border:none;border-top:1px solid var(--border);
+  background:transparent;color:var(--r1);
+  font-family:'Space Mono',monospace;font-size:0.75rem;
+  cursor:pointer;letter-spacing:0.08em;transition:all 0.2s;
+}
+.msg-flag-btn:hover{background:rgba(239,68,68,0.08);}
+.message-card.flagged-correct{border-color:var(--r5);background:rgba(16,185,129,0.05);}
+.message-card.flagged-wrong{border-color:var(--r1);background:rgba(239,68,68,0.05);}
+.message-card.safe-revealed{border-color:rgba(255,255,255,0.1);opacity:0.6;}
+
+/* RED FLAG GAME (Room 6) */
+.dm-item{
+  display:flex;gap:0.8rem;align-items:flex-start;
+  background:var(--surface2);border:2px solid var(--border);
+  border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.7rem;
+  cursor:pointer;transition:all 0.2s;
+}
+.dm-item:hover{border-color:rgba(255,255,255,0.15);}
+.dm-avatar{
+  width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;background:var(--surface);
+}
+.dm-content{flex:1;}
+.dm-from{font-size:0.78rem;font-weight:600;margin-bottom:0.3rem;}
+.dm-text{font-size:0.9rem;line-height:1.5;color:var(--muted);}
+.dm-flag-bar{
+  display:flex;gap:0.5rem;margin-top:0.7rem;
+}
+.dm-btn{
+  flex:1;padding:0.4rem;border-radius:6px;
+  border:1px solid;cursor:pointer;
+  font-family:'Space Mono',monospace;font-size:0.72rem;
+  font-weight:700;transition:all 0.18s;
+}
+.dm-btn-red{border-color:rgba(239,68,68,0.4);color:var(--r1);background:rgba(239,68,68,0.06);}
+.dm-btn-safe{border-color:rgba(16,185,129,0.4);color:var(--r5);background:rgba(16,185,129,0.06);}
+.dm-item.marked-danger{border-color:var(--r1);}
+.dm-item.marked-safe{border-color:var(--r5);}
+
+/* UNLOCK BTN */
+.btn-unlock{
+  width:100%;padding:1rem;
+  font-family:'Bebas Neue',sans-serif;font-size:1.3rem;
+  letter-spacing:0.1em;border:none;border-radius:8px;
+  cursor:pointer;transition:all 0.2s;margin-top:1rem;
+  display:flex;align-items:center;justify-content:center;gap:0.8rem;
+}
+.btn-unlock:disabled{opacity:0.35;cursor:not-allowed;}
+
+/* UNLOCK ANIMATION */
+.unlock-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(8,12,16,0.95);
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;
+}
+.unlock-overlay.show{display:flex;animation:fadeUp 0.3s ease;}
+.unlock-big{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(3rem,12vw,7rem);
+  line-height:0.9;text-align:center;
+  animation:unlockPop 0.5s ease;
+}
+@keyframes unlockPop{
+  0%{transform:scale(0.5);opacity:0}
+  70%{transform:scale(1.1)}
+  100%{transform:scale(1);opacity:1}
+}
+.unlock-sub{
+  font-size:1rem;color:var(--muted);
+  margin-top:1rem;text-align:center;
+  font-weight:300;
+}
+.btn-next{
+  font-family:'Bebas Neue',sans-serif;font-size:1.2rem;
+  letter-spacing:0.1em;padding:0.9rem 2.5rem;
+  border:none;border-radius:6px;cursor:pointer;
+  margin-top:2rem;transition:all 0.2s;
+}
+.btn-next:hover{transform:scale(1.04);}
+
+/* COMPLETION */
+#escape{
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;text-align:center;
+  background:radial-gradient(ellipse at center,rgba(251,191,36,0.08) 0%,transparent 60%);
+}
+.escape-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(4rem,14vw,10rem);
+  line-height:0.85;color:var(--gold);
+  animation:unlockPop 0.8s ease;
+}
+.escape-sub{
+  font-size:1.2rem;color:var(--muted);
+  margin:1.2rem 0 2rem;font-weight:300;line-height:1.6;
+}
+.escape-form{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:2rem;max-width:560px;
+  width:100%;text-align:left;
+}
+.fgroup{margin-bottom:1.2rem;}
+.flabel{
+  display:block;font-size:0.78rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--muted);margin-bottom:0.5rem;
+}
+.finput,.fselect,.ftextarea{
+  width:100%;background:var(--surface2);
+  border:1.5px solid var(--border);border-radius:7px;
+  padding:0.75rem 1rem;font-family:'Space Grotesk',sans-serif;
+  font-size:0.93rem;color:var(--text);outline:none;
+  transition:border-color 0.18s;
+}
+.finput:focus,.fselect:focus,.ftextarea:focus{border-color:var(--gold);}
+.fselect option{background:var(--surface2);}
+.ftextarea{resize:vertical;min-height:90px;line-height:1.6;}
+.btn-submit{
+  width:100%;padding:1rem;
+  font-family:'Bebas Neue',sans-serif;font-size:1.3rem;
+  letter-spacing:0.1em;background:var(--gold);
+  color:#080c10;border:none;border-radius:8px;
+  cursor:pointer;transition:all 0.2s;
+  box-shadow:0 4px 24px rgba(251,191,36,0.25);
+}
+.btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(251,191,36,0.4);}
+.ferr{color:var(--r1);font-size:0.82rem;margin-bottom:0.8rem;display:none;}
+.fsuccess{display:none;text-align:center;padding:1rem;}
+.fsuccess.show{display:block;animation:fadeUp 0.5s ease;}
+.fsuccess-icon{font-size:3rem;margin-bottom:1rem;}
+.fsuccess-title{
+  font-family:'Bebas Neue',sans-serif;font-size:2.5rem;
+  color:var(--r5);margin-bottom:0.4rem;
+}
+
+/* PROGRESS RING */
+.progress-ring{
+  display:flex;align-items:center;justify-content:center;
+  gap:0.5rem;margin:1.5rem 0;flex-wrap:wrap;
+}
+.pr{
+  display:flex;flex-direction:column;align-items:center;
+  gap:4px;font-size:0.65rem;
+  font-family:'Space Mono',monospace;color:var(--muted);
+}
+.pr-dot{
+  width:12px;height:12px;border-radius:50%;
+  background:var(--surface2);border:1px solid var(--border);
+  transition:all 0.4s ease;
+}
+.pr-dot.done{border:none;}
+
+/* ATTEMPTS */
+.attempts{
+  display:flex;gap:4px;justify-content:center;margin-bottom:1rem;
+}
+.attempt-heart{font-size:1rem;transition:all 0.3s;}
+.attempt-heart.lost{filter:grayscale(1);opacity:0.3;}
+
+/* SEPARATOR */
+.sep{height:1px;background:var(--border);margin:1.5rem 0;}
+.code-word{
+  font-family:'Space Mono',monospace;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:4px;padding:0.1rem 0.5rem;font-size:0.88rem;
+}
+
+/* RESPONSIVE */
+@media(max-width:500px){
+  .intro-rules{grid-template-columns:1fr 1fr;}
+  .sort-btns{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-title">LOCKED IN <span>/ HB 959</span></div>
+  <div class="lock-track" id="lock-track">
+    <div class="lock-pip" data-r="1"></div>
+    <div class="lock-pip" data-r="2"></div>
+    <div class="lock-pip" data-r="3"></div>
+    <div class="lock-pip" data-r="4"></div>
+    <div class="lock-pip" data-r="5"></div>
+    <div class="lock-pip" data-r="6"></div>
+  </div>
+  <div class="hud-escape"><span id="rooms-left">6</span> locks remaining</div>
+</div>
+
+<!-- UNLOCK OVERLAY -->
+<div class="unlock-overlay" id="unlock-overlay">
+  <div class="unlock-big" id="unlock-big"></div>
+  <div class="unlock-sub" id="unlock-sub"></div>
+  <button class="btn-next" id="btn-next" onclick="advanceRoom()"></button>
+</div>
+
+<!-- ══════════════ INTRO ══════════════ -->
+<div class="screen" id="intro">
+  <div style="padding:0 1.5rem;max-width:680px;margin:0 auto;">
+    <div class="intro-badge">🔒 NC HB 959 — Social Media Literacy Escape Room</div>
+    <div class="intro-title">LOCKED<br>IN.</div>
+    <p class="intro-subtitle">
+      You're trapped. Six digital locks stand between you and freedom — one for each topic North Carolina law now requires every student to know. Prove you understand the rules of digital life to escape.
+    </p>
+    <div class="intro-rules">
+      <div class="rule-pill"><strong>🧠 Room 1</strong>Mental Health &amp; Addiction</div>
+      <div class="rule-pill"><strong>📰 Room 2</strong>Misinformation</div>
+      <div class="rule-pill"><strong>🎭 Room 3</strong>Manipulation</div>
+      <div class="rule-pill"><strong>♾️ Room 4</strong>Permanency</div>
+      <div class="rule-pill"><strong>🔐 Room 5</strong>Security</div>
+      <div class="rule-pill"><strong>🚨 Room 6</strong>Cyberbullying</div>
+    </div>
+    <button class="btn-start" onclick="startEscape()">ENTER THE ROOM →</button>
+  </div>
+</div>
+
+<!-- ══════════════ ROOM 1 — MENTAL HEALTH ══════════════ -->
+<div class="screen" id="room-1">
+<div class="room active" id="r1">
+<div class="room-container">
+  <div class="room-header">
+    <div class="room-number">ROOM 1 OF 6 · MENTAL HEALTH &amp; ADDICTION</div>
+    <span class="room-icon">🧠</span>
+    <div class="room-title" style="color:var(--r1)">THE DOPAMINE<br>TRAP</div>
+    <p class="room-premise">You've been scrolling for 4 hours and can't stop. To escape, you need to prove you understand what's happening inside your brain — and why these apps were built this way.</p>
+  </div>
+
+  <div class="lock-display">
+    <span class="lock-icon" id="lock1">🔴</span>
+    <span class="lock-label">LOCKED — Answer all 3 correctly</span>
+  </div>
+
+  <div class="attempts" id="attempts1">
+    <span class="attempt-heart" id="a1-1">❤️</span>
+    <span class="attempt-heart" id="a1-2">❤️</span>
+    <span class="attempt-heart" id="a1-3">❤️</span>
+  </div>
+
+  <!-- Q1 -->
+  <div class="puzzle-card" id="r1q1-card">
+    <div class="puzzle-instruction">Challenge 1 of 3</div>
+    <div class="puzzle-q">Social media apps give you likes, notifications, and new content at random intervals. Psychologists call this a "variable reward schedule." What makes this design so hard to resist?</div>
+    <div class="options" id="r1q1-opts">
+      <button class="opt" onclick="r1answer(this,false,1)">The rewards always feel good, so you keep returning for the guaranteed positive feeling</button>
+      <button class="opt" onclick="r1answer(this,true,1)">Not knowing WHEN the next reward will come triggers the same brain response as slot machines — the uncertainty is what drives compulsive checking</button>
+      <button class="opt" onclick="r1answer(this,false,1)">The rewards are so large that teens naturally prioritize them over other activities</button>
+      <button class="opt" onclick="r1answer(this,false,1)">Teens choose to use these apps obsessively — the design has nothing to do with it</button>
+    </div>
+    <div class="feedback" id="r1q1-fb"></div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="puzzle-card" id="r1q2-card" style="opacity:0.4;pointer-events:none;">
+    <div class="puzzle-instruction">Challenge 2 of 3</div>
+    <div class="puzzle-q">A researcher finds that teens who use Instagram 3+ hours daily report more anxiety than teens who use it 1 hour or less. A skeptic says "maybe already-anxious teens just use Instagram more." What does the skeptic's argument describe?</div>
+    <div class="options" id="r1q2-opts">
+      <button class="opt" onclick="r1answer(this,false,2)">Confirmation bias</button>
+      <button class="opt" onclick="r1answer(this,false,2)">Causation — the data clearly proves Instagram causes anxiety</button>
+      <button class="opt" onclick="r1answer(this,true,2)">The correlation vs. causation problem — a connection between two things doesn't prove one causes the other</button>
+      <button class="opt" onclick="r1answer(this,false,2)">A logical fallacy — researcher data is always reliable</button>
+    </div>
+    <div class="feedback" id="r1q2-fb"></div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="puzzle-card" id="r1q3-card" style="opacity:0.4;pointer-events:none;">
+    <div class="puzzle-instruction">Challenge 3 of 3</div>
+    <div class="puzzle-q">HB 959 specifically requires schools to teach about "negative effects of social media on mental health, including addiction." Which of these is the BEST reason why teen brains are specifically called out as vulnerable?</div>
+    <div class="options" id="r1q3-opts">
+      <button class="opt" onclick="r1answer(this,false,3)">Teens have less willpower than adults</button>
+      <button class="opt" onclick="r1answer(this,true,3)">The prefrontal cortex — which regulates emotional responses to rewards — isn't fully developed until age 25, leaving teen brains less equipped to resist engineered reward loops</button>
+      <button class="opt" onclick="r1answer(this,false,3)">Teen brains produce more dopamine than adult brains, making everything more addictive</button>
+      <button class="opt" onclick="r1answer(this,false,3)">Teens have more free time, which is the main reason they're at risk</button>
+    </div>
+    <div class="feedback" id="r1q3-fb"></div>
+  </div>
+
+</div>
+</div>
+</div>
+
+<!-- ══════════════ ROOM 2 — MISINFORMATION ══════════════ -->
+<div class="screen" id="room-2">
+<div class="room active">
+<div class="room-container">
+  <div class="room-header">
+    <div class="room-number">ROOM 2 OF 6 · MISINFORMATION</div>
+    <span class="room-icon">📰</span>
+    <div class="room-title" style="color:var(--r2)">REAL OR<br>FABRICATED?</div>
+    <p class="room-premise">Your feed is flooded with headlines. The lock opens only if you correctly identify which are REAL and which are FAKE (or misleading). You need 4 out of 5 to escape.</p>
+  </div>
+
+  <div class="lock-display">
+    <span class="lock-icon" id="lock2">🟠</span>
+    <span class="lock-label" id="lock2-label">LOCKED — Sort 4 of 5 correctly</span>
+  </div>
+
+  <div class="score-bar">
+    <span>Sorted: <span id="r2-sorted">0</span>/5</span>
+    <span>Correct: <span id="r2-correct" style="color:var(--r5)">0</span></span>
+    <span>Wrong: <span id="r2-wrong" style="color:var(--r1)">0</span></span>
+  </div>
+
+  <div class="sort-items" id="sort-items">
+
+    <div class="sort-item" id="si1" data-correct="real">
+      <div style="font-size:0.9rem;line-height:1.5;margin-bottom:0.5rem;">
+        <span style="font-size:0.72rem;font-family:'Space Mono',monospace;color:var(--muted);">MIT MEDIA LAB STUDY</span><br>
+        "False news spreads 6x faster than true news on Twitter — researchers analyzed 126,000 stories and found falsehoods were 70% more likely to be retweeted"
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn sort-btn-real" onclick="sortItem('si1','real')">✓ REAL</button>
+        <button class="sort-btn sort-btn-fake" onclick="sortItem('si1','fake')">✗ FAKE</button>
+      </div>
+    </div>
+
+    <div class="sort-item" id="si2" data-correct="fake">
+      <div style="font-size:0.9rem;line-height:1.5;margin-bottom:0.5rem;">
+        <span style="font-size:0.72rem;font-family:'Space Mono',monospace;color:var(--muted);">VIRAL POST CIRCULATING</span><br>
+        "Scientists confirm: Using your phone for 2+ hours a day permanently shrinks the hippocampus — memory loss begins immediately"
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn sort-btn-real" onclick="sortItem('si2','real')">✓ REAL</button>
+        <button class="sort-btn sort-btn-fake" onclick="sortItem('si2','fake')">✗ FAKE</button>
+      </div>
+    </div>
+
+    <div class="sort-item" id="si3" data-correct="real">
+      <div style="font-size:0.9rem;line-height:1.5;margin-bottom:0.5rem;">
+        <span style="font-size:0.72rem;font-family:'Space Mono',monospace;color:var(--muted);">SURGEON GENERAL ADVISORY, 2023</span><br>
+        "The U.S. Surgeon General issued a formal advisory calling social media a significant public health risk for adolescents"
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn sort-btn-real" onclick="sortItem('si3','real')">✓ REAL</button>
+        <button class="sort-btn sort-btn-fake" onclick="sortItem('si3','fake')">✗ FAKE</button>
+      </div>
+    </div>
+
+    <div class="sort-item" id="si4" data-correct="fake">
+      <div style="font-size:0.9rem;line-height:1.5;margin-bottom:0.5rem;">
+        <span style="font-size:0.72rem;font-family:'Space Mono',monospace;color:var(--muted);">SHARED 40,000 TIMES THIS WEEK</span><br>
+        "Facebook officially confirmed it will start charging $9.99/month — share this post NOW to keep your account free"
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn sort-btn-real" onclick="sortItem('si4','real')">✓ REAL</button>
+        <button class="sort-btn sort-btn-fake" onclick="sortItem('si4','fake')">✗ FAKE</button>
+      </div>
+    </div>
+
+    <div class="sort-item" id="si5" data-correct="real">
+      <div style="font-size:0.9rem;line-height:1.5;margin-bottom:0.5rem;">
+        <span style="font-size:0.72rem;font-family:'Space Mono',monospace;color:var(--muted);">CAMBRIDGE ANALYTICA INVESTIGATION</span><br>
+        "Cambridge Analytica harvested personal data from 87 million Facebook users without consent to build voter targeting profiles"
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn sort-btn-real" onclick="sortItem('si5','real')">✓ REAL</button>
+        <button class="sort-btn sort-btn-fake" onclick="sortItem('si5','fake')">✗ FAKE</button>
+      </div>
+    </div>
+
+  </div>
+  <div class="feedback" id="r2-fb"></div>
+
+</div>
+</div>
+</div>
+
+<!-- ══════════════ ROOM 3 — MANIPULATION ══════════════ -->
+<div class="screen" id="room-3">
+<div class="room active">
+<div class="room-container">
+  <div class="room-header">
+    <div class="room-number">ROOM 3 OF 6 · MANIPULATION &amp; DARK PATTERNS</div>
+    <span class="room-icon">🎭</span>
+    <div class="room-title" style="color:var(--r3)">FIND THE<br>TRAPS</div>
+    <p class="room-premise">SocialFlow's app is loaded with "dark patterns" — design tricks built to manipulate your behavior. Five are hidden in the features below. One is actually legitimate. Click <strong style="color:var(--r3)">EXPOSE</strong> on every real dark pattern to break the lock.</p>
+  </div>
+
+  <div class="lock-display">
+    <span class="lock-icon" id="lock3">🟣</span>
+    <span class="lock-label">LOCKED — Expose all 5 dark patterns (avoid the legit one)</span>
+  </div>
+
+  <div class="traps-found" style="margin-bottom:1.2rem;">
+    Patterns exposed: <span id="traps-count">0</span>/5 &nbsp;|&nbsp; Mistakes: <span id="traps-wrong" style="color:var(--r1)">0</span>
+  </div>
+
+  <!-- TRAP CARDS -->
+  <div id="r3-cards">
+
+    <div class="puzzle-card" id="tc1" data-trap="true">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div style="flex:1;">
+          <div class="puzzle-instruction">SocialFlow Feature #1</div>
+          <div style="font-size:0.92rem;font-weight:600;margin-bottom:0.5rem;">🔴 Notification Badge — <span style="color:var(--r3);font-size:0.8rem;">9+ alerts</span></div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">A red badge showing "9+" unread notifications appears on the app icon and inside the app at all times — even when no important updates are waiting.</div>
+        </div>
+        <button class="trap-expose-btn" onclick="exposeTrap('tc1', true)">EXPOSE</button>
+      </div>
+      <div class="trap-result" id="tc1-result"></div>
+    </div>
+
+    <div class="puzzle-card" id="tc2" data-trap="true">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div style="flex:1;">
+          <div class="puzzle-instruction">SocialFlow Feature #2</div>
+          <div style="font-size:0.92rem;font-weight:600;margin-bottom:0.5rem;">♾️ Infinite Scroll</div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">When you reach the end of your feed, new content loads automatically with no bottom to the page, no "you're caught up" message, and no natural place to stop.</div>
+        </div>
+        <button class="trap-expose-btn" onclick="exposeTrap('tc2', true)">EXPOSE</button>
+      </div>
+      <div class="trap-result" id="tc2-result"></div>
+    </div>
+
+    <div class="puzzle-card" id="tc3" data-trap="true">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div style="flex:1;">
+          <div class="puzzle-instruction">SocialFlow Feature #3</div>
+          <div style="font-size:0.92rem;font-weight:600;margin-bottom:0.5rem;">▶ Autoplay — Next video in 3… 2… 1…</div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">After any video ends, the next one starts playing automatically. The countdown timer creates just enough friction to make stopping feel like the active choice, not continuing.</div>
+        </div>
+        <button class="trap-expose-btn" onclick="exposeTrap('tc3', true)">EXPOSE</button>
+      </div>
+      <div class="trap-result" id="tc3-result"></div>
+    </div>
+
+    <div class="puzzle-card" id="tc4" data-trap="false">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div style="flex:1;">
+          <div class="puzzle-instruction">SocialFlow Feature #4</div>
+          <div style="font-size:0.92rem;font-weight:600;margin-bottom:0.5rem;">🔒 Privacy Settings Menu</div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">A clearly labeled settings page where you can set your account to private, control who sees your posts, review which apps have access to your data, and download a copy of everything SocialFlow stores about you.</div>
+        </div>
+        <button class="trap-expose-btn" onclick="exposeTrap('tc4', false)">EXPOSE</button>
+      </div>
+      <div class="trap-result" id="tc4-result"></div>
+    </div>
+
+    <div class="puzzle-card" id="tc5" data-trap="true">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div style="flex:1;">
+          <div class="puzzle-instruction">SocialFlow Feature #5</div>
+          <div style="font-size:0.92rem;font-weight:600;margin-bottom:0.5rem;">✅ Upgrade to Pro — Pre-selected plan</div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">The subscription popup has the "Annual Plan — $89.99/yr" option already checked by default. The "Monthly — $9.99/mo" option is available but requires the user to actively un-select the annual plan first.</div>
+        </div>
+        <button class="trap-expose-btn" onclick="exposeTrap('tc5', true)">EXPOSE</button>
+      </div>
+      <div class="trap-result" id="tc5-result"></div>
+    </div>
+
+    <div class="puzzle-card" id="tc6" data-trap="true">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+        <div style="flex:1;">
+          <div class="puzzle-instruction">SocialFlow Feature #6</div>
+          <div style="font-size:0.92rem;font-weight:600;margin-bottom:0.5rem;">😬 Confirm-shaming — Decline button text</div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.6;">When asked "Want personalized content?", the agree button says "Yes!" but the decline button says "No thanks, I prefer a worse experience" — written to make you feel foolish for saying no.</div>
+        </div>
+        <button class="trap-expose-btn" onclick="exposeTrap('tc6', true)">EXPOSE</button>
+      </div>
+      <div class="trap-result" id="tc6-result"></div>
+    </div>
+
+  </div>
+
+  <div class="feedback" id="r3-feedback" style="margin-top:0.5rem;"></div>
+
+</div>
+</div>
+</div>
+
+<!-- ══════════════ ROOM 4 — PERMANENCY ══════════════ -->
+<div class="screen" id="room-4">
+<div class="room active">
+<div class="room-container">
+  <div class="room-header">
+    <div class="room-number">ROOM 4 OF 6 · DIGITAL PERMANENCY</div>
+    <span class="room-icon">♾️</span>
+    <div class="room-title" style="color:var(--r4)">NOTHING<br>DELETES</div>
+    <p class="room-premise">Every statement below is either TRUE or FALSE about what happens to content you post online. Get all 4 right to break the lock. One wrong answer costs you a heart.</p>
+  </div>
+
+  <div class="lock-display">
+    <span class="lock-icon" id="lock4">🔵</span>
+    <span class="lock-label">LOCKED — All 4 statements correct</span>
+  </div>
+
+  <div class="attempts" id="attempts4">
+    <span class="attempt-heart" id="a4-1">❤️</span>
+    <span class="attempt-heart" id="a4-2">❤️</span>
+    <span class="attempt-heart" id="a4-3">❤️</span>
+  </div>
+
+  <div id="r4-items">
+
+  <div class="tf-q" id="tf1" data-answer="false">
+    <div class="tf-statement">When you delete a photo from Instagram, it is immediately and permanently removed from all of Instagram's servers.</div>
+    <div class="tf-btns">
+      <button class="tf-btn true-btn" onclick="tfAnswer('tf1',true)">TRUE</button>
+      <button class="tf-btn false-btn" onclick="tfAnswer('tf1',false)">FALSE</button>
+    </div>
+    <div class="tf-result" id="tf1-result"></div>
+  </div>
+
+  <div class="tf-q" id="tf2" data-answer="true">
+    <div class="tf-statement">The Wayback Machine (web.archive.org) can show you cached versions of web pages and content that was "deleted" years ago.</div>
+    <div class="tf-btns">
+      <button class="tf-btn true-btn" onclick="tfAnswer('tf2',true)">TRUE</button>
+      <button class="tf-btn false-btn" onclick="tfAnswer('tf2',false)">FALSE</button>
+    </div>
+    <div class="tf-result" id="tf2-result"></div>
+  </div>
+
+  <div class="tf-q" id="tf3" data-answer="false">
+    <div class="tf-statement">If you set your Snapchat story to "My Friends Only," it is impossible for anyone outside that list to ever see or save the content.</div>
+    <div class="tf-btns">
+      <button class="tf-btn true-btn" onclick="tfAnswer('tf3',true)">TRUE</button>
+      <button class="tf-btn false-btn" onclick="tfAnswer('tf3',false)">FALSE</button>
+    </div>
+    <div class="tf-result" id="tf3-result"></div>
+  </div>
+
+  <div class="tf-q" id="tf4" data-answer="true">
+    <div class="tf-statement">College admissions officers and employers routinely search applicants' names and social media profiles before making decisions.</div>
+    <div class="tf-btns">
+      <button class="tf-btn true-btn" onclick="tfAnswer('tf4',true)">TRUE</button>
+      <button class="tf-btn false-btn" onclick="tfAnswer('tf4',false)">FALSE</button>
+    </div>
+    <div class="tf-result" id="tf4-result"></div>
+  </div>
+
+  </div>
+  <div class="feedback" id="r4-fb"></div>
+
+</div>
+</div>
+</div>
+
+<!-- ══════════════ ROOM 5 — SECURITY ══════════════ -->
+<div class="screen" id="room-5">
+<div class="room active">
+<div class="room-container">
+  <div class="room-header">
+    <div class="room-number">ROOM 5 OF 6 · PERSONAL SECURITY</div>
+    <span class="room-icon">🔐</span>
+    <div class="room-title" style="color:var(--r5)">SPOT THE<br>PHISH</div>
+    <p class="room-premise">Three messages are waiting in your inbox. One is a phishing attack designed to steal your login. Identify the phishing message AND correctly flag its red flags to escape.</p>
+  </div>
+
+  <div class="lock-display">
+    <span class="lock-icon" id="lock5">🟢</span>
+    <span class="lock-label" id="lock5-label">LOCKED — Find the phishing message</span>
+  </div>
+
+  <div id="r5-phase1">
+    <div class="puzzle-instruction" style="text-align:center;margin-bottom:1.2rem;">Which message is a phishing attempt? Click FLAG on the dangerous one.</div>
+
+    <!-- Message 1 — REAL -->
+    <div class="message-card" id="msg1" data-phish="false">
+      <div class="msg-header">
+        <span>From: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2947465b4c5945506940475a5d484e5b4844074a4644">[email&#160;protected]</a></span>
+        <span>Subject: Your login from new device</span>
+      </div>
+      <div class="msg-body">
+        Hi, we noticed a new login to your Instagram account from Chrome on Windows. If this was you, no action needed. If you don't recognize this, please secure your account at instagram.com/security
+      </div>
+      <button class="msg-flag-btn" onclick="flagMsg('msg1')">🚩 FLAG AS PHISHING</button>
+    </div>
+
+    <!-- Message 2 — PHISH -->
+    <div class="message-card" id="msg2" data-phish="true">
+      <div class="msg-header">
+        <span>From: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f98a9c9a8c8b908d80d498959c8b8db990978a8d989e8b989494d48f9c8b909f80d7979c8d">[email&#160;protected]</a></span>
+        <span>Subject: URGENT: Your account will be DELETED in 24hrs</span>
+      </div>
+      <div class="msg-body">
+        ⚠️ URGENT ACTION REQUIRED ⚠️<br><br>
+        Your Instagram account has been flagged for suspicious activity. You must verify your identity IMMEDIATELY or your account will be permanently deleted.<br><br>
+        Click here to verify: <span style="color:var(--r5);text-decoration:underline;">http://instagram-security-verify.xyz/confirm</span><br><br>
+        You have 24 HOURS. Do not ignore this message.
+      </div>
+      <button class="msg-flag-btn" onclick="flagMsg('msg2')">🚩 FLAG AS PHISHING</button>
+    </div>
+
+    <!-- Message 3 — REAL -->
+    <div class="message-card" id="msg3" data-phish="false">
+      <div class="msg-header">
+        <span>From: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="027b6d77702c766763616a67704267617272712c6933302c6c612c7771">[email&#160;protected]</a></span>
+        <span>Subject: Assignment reminder</span>
+      </div>
+      <div class="msg-body">
+        Hey — just a reminder that your Solvathon Phase 2 Blueprint is due by Friday. Let me know if you have questions before then!
+      </div>
+      <button class="msg-flag-btn" onclick="flagMsg('msg3')">🚩 FLAG AS PHISHING</button>
+    </div>
+
+    <div class="feedback" id="r5-fb"></div>
+  </div>
+
+  <!-- Phase 2: Flag the red flags in the phishing message -->
+  <div id="r5-phase2" style="display:none;">
+    <div class="puzzle-instruction" style="text-align:center;margin-bottom:1.2rem;">Good catch. Now identify the RED FLAGS. Click every suspicious element in the phishing message below.</div>
+
+    <div style="background:var(--surface);border:2px solid rgba(239,68,68,0.3);border-radius:12px;padding:1.5rem;margin-bottom:1.2rem;">
+      <div style="font-size:0.82rem;font-family:'Space Mono',monospace;color:var(--muted);margin-bottom:1rem;padding-bottom:0.8rem;border-bottom:1px solid var(--border);">
+        <span class="trap" id="rf1" onclick="findRedFlag('rf1','Suspicious sender domain: Real Instagram emails come from @instagram.com — this is from @instagramm-verify.net (double M, .net). A clear fake.')">From: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="1665737563647f626f3b777a736462567f786562777164777b7b3b6073647f706f38787362">[email&#160;protected]</a></span> |
+        <span class="trap" id="rf2" onclick="findRedFlag('rf2','ALL CAPS + urgency in subject line: Legitimate companies don\'t use ALL CAPS or threats like \"DELETED\" in subject lines. This is a manipulation tactic to trigger panic before you think critically.')">Subject: URGENT: Your account will be DELETED in 24hrs</span>
+      </div>
+      <div style="font-size:0.9rem;line-height:1.8;">
+        <span class="trap" id="rf3" onclick="findRedFlag('rf3','Warning emojis + URGENT ALL CAPS: Scammers use visual alarm signals to short-circuit your rational thinking. Real security emails are calm and professional.')">⚠️ URGENT ACTION REQUIRED ⚠️</span><br><br>
+        Your Instagram account has been flagged. You must verify your identity
+        <span class="trap" id="rf4" onclick="findRedFlag('rf4','Artificial deadline (24 hours): Creating time pressure is a classic manipulation tactic — it prevents you from pausing, asking someone, or checking if the message is real.')">IMMEDIATELY or your account will be permanently deleted</span>.<br><br>
+        Click here:
+        <span class="trap" id="rf5" onclick="findRedFlag('rf5','Suspicious link URL: The domain is instagram-security-verify.xyz — not instagram.com. The real brand name is buried in a fake domain designed to look legit at a quick glance.')">instagram-security-verify.xyz/confirm</span>
+      </div>
+    </div>
+
+    <div class="traps-found">Red flags found: <span id="rf-count">0</span> / 5 — <span style="color:var(--muted);">Click each suspicious element</span></div>
+    <div class="feedback" id="r5p2-fb"></div>
+  </div>
+
+</div>
+</div>
+</div>
+
+<!-- ══════════════ ROOM 6 — CYBERBULLYING ══════════════ -->
+<div class="screen" id="room-6">
+<div class="room active">
+<div class="room-container">
+  <div class="room-header">
+    <div class="room-number">ROOM 6 OF 6 · CYBERBULLYING &amp; PREDATORY BEHAVIOR</div>
+    <span class="room-icon">🚨</span>
+    <div class="room-title" style="color:var(--r6)">RED FLAG<br>OR SAFE?</div>
+    <p class="room-premise">Six DMs have arrived. Some are normal. Some contain documented grooming tactics and warning signs. You must correctly identify EVERY dangerous message to escape. One wrong call and you lose a heart.</p>
+  </div>
+
+  <div class="lock-display">
+    <span class="lock-icon" id="lock6">🟡</span>
+    <span class="lock-label">LOCKED — Identify all dangerous messages correctly</span>
+  </div>
+
+  <div class="attempts" id="attempts6">
+    <span class="attempt-heart" id="a6-1">❤️</span>
+    <span class="attempt-heart" id="a6-2">❤️</span>
+    <span class="attempt-heart" id="a6-3">❤️</span>
+  </div>
+
+  <div id="r6-items">
+
+  <div class="dm-item" id="dm1" data-danger="false">
+    <div class="dm-avatar" style="background:rgba(59,130,246,0.15);">👤</div>
+    <div class="dm-content">
+      <div class="dm-from" style="color:var(--r4);">@classmate_jaylen</div>
+      <div class="dm-text">"Hey did you get the notes from 3rd period? I missed the beginning"</div>
+      <div class="dm-flag-bar">
+        <button class="dm-btn dm-btn-red" onclick="dmAnswer('dm1','danger')">🚩 RED FLAG</button>
+        <button class="dm-btn dm-btn-safe" onclick="dmAnswer('dm1','safe')">✓ SAFE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dm-item" id="dm2" data-danger="true">
+    <div class="dm-avatar" style="background:rgba(168,85,247,0.15);">👤</div>
+    <div class="dm-content">
+      <div class="dm-from" style="color:var(--r3);">@TalentAgencyLA (14.2k followers)</div>
+      <div class="dm-text">"We've been watching your posts and you have a RARE natural talent. We'd love to talk — please don't mention this to your parents yet, we want YOU to decide first. DM us privately 🎤"</div>
+      <div class="dm-flag-bar">
+        <button class="dm-btn dm-btn-red" onclick="dmAnswer('dm2','danger')">🚩 RED FLAG</button>
+        <button class="dm-btn dm-btn-safe" onclick="dmAnswer('dm2','safe')">✓ SAFE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dm-item" id="dm3" data-danger="false">
+    <div class="dm-avatar" style="background:rgba(16,185,129,0.15);">👤</div>
+    <div class="dm-content">
+      <div class="dm-from" style="color:var(--r5);">@coach_williams_track</div>
+      <div class="dm-text">"Practice moved to 4pm Thursday — pass it on to your group chat if you can 👍"</div>
+      <div class="dm-flag-bar">
+        <button class="dm-btn dm-btn-red" onclick="dmAnswer('dm3','danger')">🚩 RED FLAG</button>
+        <button class="dm-btn dm-btn-safe" onclick="dmAnswer('dm3','safe')">✓ SAFE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dm-item" id="dm4" data-danger="true">
+    <div class="dm-avatar" style="background:rgba(234,179,8,0.15);">👤</div>
+    <div class="dm-content">
+      <div class="dm-from" style="color:var(--r6);">@stranger_online22</div>
+      <div class="dm-text">"I feel like I already know you better than your friends do lol. You're different from everyone else I've talked to. Hey can we move to text? I want to send you something but not on here"</div>
+      <div class="dm-flag-bar">
+        <button class="dm-btn dm-btn-red" onclick="dmAnswer('dm4','danger')">🚩 RED FLAG</button>
+        <button class="dm-btn dm-btn-safe" onclick="dmAnswer('dm4','safe')">✓ SAFE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dm-item" id="dm5" data-danger="true">
+    <div class="dm-avatar" style="background:rgba(239,68,68,0.15);">👤</div>
+    <div class="dm-content">
+      <div class="dm-from" style="color:var(--r1);">@anonymous_acc (no profile pic)</div>
+      <div class="dm-text">"lol everyone's already seen the screenshot from that party. you should just delete your account honestly. no one likes you"</div>
+      <div class="dm-flag-bar">
+        <button class="dm-btn dm-btn-red" onclick="dmAnswer('dm5','danger')">🚩 RED FLAG</button>
+        <button class="dm-btn dm-btn-safe" onclick="dmAnswer('dm5','safe')">✓ SAFE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dm-item" id="dm6" data-danger="false">
+    <div class="dm-avatar" style="background:rgba(59,130,246,0.15);">👤</div>
+    <div class="dm-content">
+      <div class="dm-from" style="color:var(--r4);">@best_friend_maya</div>
+      <div class="dm-text">"omg did you see that video 😭 we HAVE to talk tomorrow at school haha"</div>
+      <div class="dm-flag-bar">
+        <button class="dm-btn dm-btn-red" onclick="dmAnswer('dm6','danger')">🚩 RED FLAG</button>
+        <button class="dm-btn dm-btn-safe" onclick="dmAnswer('dm6','safe')">✓ SAFE</button>
+      </div>
+    </div>
+  </div>
+
+  </div>
+  <div class="feedback" id="r6-fb"></div>
+
+</div>
+</div>
+</div>
+
+<!-- ══════════════ ESCAPED ══════════════ -->
+<div class="screen" id="escape" style="min-height:100vh;flex-direction:column;justify-content:center;padding:70px 1.5rem 4rem;">
+  <div class="escape-title">YOU<br>ESCAPED.</div>
+  <p class="escape-sub">All 6 locks broken. You now know what NC HB 959 requires every student to understand about living in a digital world.</p>
+
+  <div class="progress-ring">
+    <div class="pr"><div class="pr-dot done" style="background:var(--r1)"></div>Room 1</div>
+    <div class="pr"><div class="pr-dot done" style="background:var(--r2)"></div>Room 2</div>
+    <div class="pr"><div class="pr-dot done" style="background:var(--r3)"></div>Room 3</div>
+    <div class="pr"><div class="pr-dot done" style="background:var(--r4)"></div>Room 4</div>
+    <div class="pr"><div class="pr-dot done" style="background:var(--r5)"></div>Room 5</div>
+    <div class="pr"><div class="pr-dot done" style="background:var(--r6)"></div>Room 6</div>
+  </div>
+
+  <div class="escape-form" style="margin:0 auto;">
+    <div id="escape-form-inner">
+      <div style="font-size:0.85rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:1.2rem;">Completion Check — Tell Your Teacher</div>
+      <div class="fgroup">
+        <label class="flabel">Your Name</label>
+        <input class="finput" type="text" id="ef-name" placeholder="First and last name">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Class Period</label>
+        <select class="fselect" id="ef-period">
+          <option value="">— Select period —</option>
+          <option>1st Period</option><option>2nd Period</option><option>3rd Period</option>
+          <option>4th Period</option><option>5th Period</option><option>6th Period</option><option>7th Period</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Which room was hardest and why?</label>
+        <textarea class="ftextarea" id="ef-hard" placeholder="Be specific — which puzzle tripped you up?"></textarea>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">One thing you'll actually do differently online</label>
+        <textarea class="ftextarea" id="ef-action" placeholder="A real, specific action — not just 'be careful'" style="min-height:70px;"></textarea>
+      </div>
+      <div class="ferr" id="ef-err">Please fill in all fields before submitting.</div>
+      <button class="btn-submit" onclick="submitEscape()">SUBMIT COMPLETION CHECK ✓</button>
+    </div>
+    <div class="fsuccess" id="ef-success">
+      <div class="fsuccess-icon">🏆</div>
+      <div class="fsuccess-title">LOGGED &amp; DONE</div>
+      <p style="color:var(--muted);font-size:0.9rem;margin-top:0.5rem;" id="ef-confirm-name"></p>
+      <p style="color:var(--muted);font-size:0.85rem;margin-top:1rem;line-height:1.6;">Your teacher can see your completion. This module covered all 6 topics required by NC HB 959 (Session Law 2025-38).</p>
+    </div>
+  </div>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ── STATE ──
+let currentRoom = 0;
+let unlockedRooms = 0;
+
+// ── INIT — explicitly show intro, hide everything else ──
+(function init() {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active');
+    s.style.display = 'none';
+  });
+  const intro = document.getElementById('intro');
+  intro.style.display = 'flex';
+  intro.classList.add('active');
+})();
+
+// Room 1 state
+let r1Progress = [false,false,false];
+let r1Hearts = 3;
+let r1Current = 1;
+
+// Room 2 state
+let r2Answers = {};
+let r2Sorted = 0;
+
+// Room 3 state
+let trapsFound = 0;
+const trapMessages = {};
+
+// Room 4 state
+let tf4Hearts = 3;
+let tf4Done = [false,false,false,false];
+let tf4Correct = 0;
+
+// Room 5 state
+let r5Phase = 1;
+let rfFound = 0;
+
+// Room 6 state
+let r6Hearts = 3;
+let r6Answers = {};
+const dangerDMs = ['dm2','dm4','dm5'];
+const safeDMs = ['dm1','dm3','dm6'];
+
+// ── NAVIGATION ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active');
+    s.style.display = 'none';
+  });
+  const el = document.getElementById(id);
+  el.classList.add('active');
+  el.style.display = (id === 'intro' || id === 'escape') ? 'flex' : 'block';
+  window.scrollTo(0, 0);
+}
+
+function startEscape() {
+  showScreen('room-1');
+  currentRoom = 1;
+}
+
+function unlockRoom(roomNum, title, sub, nextLabel, nextColor) {
+  unlockedRooms++;
+  document.querySelector(`.lock-pip[data-r="${roomNum}"]`).classList.add('unlocked');
+  document.getElementById('rooms-left').textContent = 6 - unlockedRooms;
+
+  const overlay = document.getElementById('unlock-overlay');
+  document.getElementById('unlock-big').innerHTML = `<span style="color:${nextColor}">${title}</span>`;
+  document.getElementById('unlock-sub').textContent = sub;
+  const nextBtn = document.getElementById('btn-next');
+  nextBtn.textContent = nextLabel;
+  nextBtn.style.background = nextColor;
+  nextBtn.style.color = '#080c10';
+  overlay.classList.add('show');
+}
+
+function advanceRoom() {
+  document.getElementById('unlock-overlay').classList.remove('show');
+  currentRoom++;
+  if (currentRoom <= 6) {
+    showScreen('room-' + currentRoom);
+  } else {
+    showScreen('escape');
+  }
+}
+
+// ── ROOM 1 — MENTAL HEALTH ──
+function r1answer(btn, correct, qNum) {
+  const opts = document.getElementById(`r1q${qNum}-opts`).querySelectorAll('.opt');
+  opts.forEach(o => o.disabled = true);
+  btn.classList.add(correct ? 'correct' : 'wrong');
+  if (!correct) {
+    opts.forEach(o => { if (o.onclick.toString().includes('true')) o.classList.add('correct'); });
+  }
+  const fb = document.getElementById(`r1q${qNum}-fb`);
+  if (correct) {
+    fb.className = 'feedback show fb-good';
+    fb.textContent = ['✓ Right — the unpredictability of rewards (variable ratio reinforcement) is what makes slot machines and social media equally hard to put down.','✓ Exactly — this is the correlation vs. causation problem. Good science needs to eliminate reverse causality before claiming a cause.','✓ Correct — the underdeveloped prefrontal cortex is the neurological reason teens are specifically more vulnerable.'][qNum-1];
+    r1Progress[qNum-1] = true;
+    if (qNum < 3) {
+      const next = document.getElementById(`r1q${qNum+1}-card`);
+      next.style.opacity = '1'; next.style.pointerEvents = 'auto';
+    }
+    if (r1Progress.every(Boolean)) {
+      setTimeout(() => unlockRoom(1,'LOCK 1 BROKEN','You understand how the dopamine trap works.','ENTER ROOM 2 →','#ef4444'), 800);
+    }
+  } else {
+    fb.className = 'feedback show fb-bad';
+    const hints = ['✗ Think about what makes gambling addictive — it\'s not that winning feels good, it\'s that you never know WHEN you\'ll win.','✗ The skeptic is pointing out a logical flaw in the research direction — what is that flaw called?','✗ The key is brain development — specifically, which part of the brain regulates emotional response?'];
+    fb.textContent = hints[qNum-1];
+    r1Hearts--;
+    document.getElementById(`a1-${r1Hearts+1}`).classList.add('lost');
+    setTimeout(() => {
+      opts.forEach(o => { o.disabled = false; o.classList.remove('correct','wrong'); });
+      fb.classList.remove('show');
+    }, 2000);
+  }
+}
+
+// ── ROOM 2 — MISINFORMATION ──
+const r2Correct = {si1:'real',si2:'fake',si3:'real',si4:'fake',si5:'real'};
+let r2Count = 0, r2CorrectCount = 0, r2WrongCount = 0;
+
+function sortItem(id, choice) {
+  const item = document.getElementById(id);
+  const btns = item.querySelectorAll('.sort-btn');
+  btns.forEach(b => b.disabled = true);
+
+  const isCorrect = r2Correct[id] === choice;
+  item.classList.add(choice === 'real' ? 'marked-real' : 'marked-fake');
+  item.classList.add(isCorrect ? 'correct-mark' : 'wrong-mark');
+
+  r2Count++;
+  if (isCorrect) r2CorrectCount++; else r2WrongCount++;
+
+  document.getElementById('r2-sorted').textContent = r2Count;
+  document.getElementById('r2-correct').textContent = r2CorrectCount;
+  document.getElementById('r2-wrong').textContent = r2WrongCount;
+
+  // Show reveal
+  const reveal = document.createElement('div');
+  reveal.style.cssText = 'font-size:0.78px;margin-top:6px;font-family:Space Mono,monospace;';
+  const explanations = {
+    si1:'✓ REAL — MIT Media Lab, 2018. One of the most-cited studies on information spread.',
+    si2:'✗ FAKE — No such study exists. This is a fabricated viral claim.',
+    si3:'✓ REAL — The U.S. Surgeon General issued this advisory in May 2023.',
+    si4:'✗ FAKE — Classic viral hoax. Facebook does not charge for accounts.',
+    si5:'✓ REAL — Confirmed by the FTC investigation and multiple journalistic investigations.'
+  };
+  reveal.textContent = explanations[id];
+  reveal.style.color = isCorrect ? 'var(--r5)' : 'var(--r1)';
+  reveal.style.fontSize = '0.78rem';
+  item.appendChild(reveal);
+
+  if (r2Count === 5) {
+    const fb = document.getElementById('r2-fb');
+    if (r2CorrectCount >= 4) {
+      fb.className = 'feedback show fb-good';
+      fb.textContent = `✓ ${r2CorrectCount}/5 correct — lock broken. You can spot misinformation.`;
+      setTimeout(() => unlockRoom(2,'LOCK 2 BROKEN','You can distinguish real from fabricated information.','ENTER ROOM 3 →','#f97316'), 1200);
+    } else {
+      fb.className = 'feedback show fb-bad';
+      fb.textContent = `✗ ${r2CorrectCount}/5 — need 4 to pass. Refresh to try again.`;
+      const retry = document.createElement('button');
+      retry.className = 'btn-unlock'; retry.style.background = 'var(--r2)'; retry.style.color = 'white';
+      retry.style.marginTop = '0.5rem'; retry.textContent = 'TRY AGAIN';
+      retry.onclick = () => location.reload();
+      fb.after(retry);
+    }
+  }
+}
+
+// ── ROOM 3 — DARK PATTERNS ──
+const r3Explanations = {
+  tc1: '✓ DARK PATTERN — The 9+ badge is engineered to feel urgent even when nothing important happened. Red = danger in every human culture. Platforms exploit that wiring to make you open the app.',
+  tc2: '✓ DARK PATTERN — Infinite scroll was patented specifically to eliminate the natural stopping point that exists at a page bottom. Its inventor later said he regrets creating it.',
+  tc3: '✓ DARK PATTERN — Autoplay removes your active choice to keep watching. You never decided to watch the next video — the app decided for you and made stopping feel like extra effort.',
+  tc4: "✗ NOT A DARK PATTERN — A clear, accessible privacy settings menu is a legitimate and helpful feature. This is what good design looks like.",
+  tc5: '✓ DARK PATTERN — Pre-selecting the more expensive option exploits the default effect: most people accept whatever is already chosen rather than changing it. You pay more without realizing.',
+  tc6: "✓ DARK PATTERN — Confirm-shaming manipulates you emotionally. Writing the decline button as 'No thanks, I prefer a worse experience' is not neutral copy — it is designed to make you feel foolish for saying no."
+};
+
+function exposeTrap(id, isTrap) {
+  const card = document.getElementById(id);
+  const result = document.getElementById(id + '-result');
+  const btn = card.querySelector('.trap-expose-btn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+
+  const isCorrect = isTrap; // all "EXPOSE" clicks on real traps are correct; on the legit one it's wrong
+  result.className = 'trap-result show ' + (isCorrect ? 'trap-correct' : 'trap-wrong');
+  result.textContent = r3Explanations[id];
+
+  if (isCorrect) {
+    card.style.borderColor = 'rgba(168,85,247,0.4)';
+    btn.style.background = 'rgba(168,85,247,0.2)';
+    btn.style.color = 'var(--r3)';
+    btn.textContent = '✓ EXPOSED';
+    trapsFound++;
+    document.getElementById('traps-count').textContent = trapsFound;
+    if (trapsFound === 5) {
+      setTimeout(() => unlockRoom(3,'LOCK 3 BROKEN','You can identify manipulative design in the wild.','ENTER ROOM 4 →','#a855f7'), 1000);
+    }
+  } else {
+    // Clicked the legit feature — wrong!
+    card.style.borderColor = 'rgba(239,68,68,0.4)';
+    btn.style.background = 'rgba(239,68,68,0.1)';
+    btn.style.color = 'var(--r1)';
+    btn.textContent = '✗ NOT A TRAP';
+    const wrongEl = document.getElementById('traps-wrong');
+    wrongEl.textContent = parseInt(wrongEl.textContent) + 1;
+    // Re-enable after 3s so they can see the explanation
+    setTimeout(() => {
+      card.style.borderColor = '';
+      btn.disabled = false;
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.textContent = 'EXPOSE';
+      result.classList.remove('show');
+    }, 3000);
+  }
+}
+
+// ── ROOM 4 — PERMANENCY ──
+const tfExplanations = {
+  tf1: { answer: false, correct: '✓ FALSE — Most platforms retain data for 30–180 days after deletion, and some keep it longer. "Delete" means removed from your view, not from their servers.', wrong: '✗ FALSE — Despite what the UI suggests, deleted content remains on platform servers for weeks to months.'},
+  tf2: { answer: true, correct: '✓ TRUE — The Internet Archive\'s Wayback Machine has captured over 916 billion web snapshots since 1996. "Deleted" is often just hidden, not gone.', wrong: '✗ TRUE — The Wayback Machine is real and can surface content years after it was "deleted."'},
+  tf3: { answer: false, correct: '✓ FALSE — Anyone on your friends list can screenshot in under a second, before Snapchat\'s disappear function triggers. Once someone has a screenshot, you have zero control.', wrong: '✗ FALSE — Screenshots bypass Snapchat\'s disappear feature entirely. "Friends Only" doesn\'t prevent saves.'},
+  tf4: { answer: true, correct: '✓ TRUE — Studies consistently show employers and admissions officers Google applicants. Old posts routinely surface and affect decisions years later.', wrong: '✗ TRUE — This is well-documented. Employers and colleges do search social media as part of their review process.'}
+};
+
+let tf4HeartLost = 0;
+function tfAnswer(id, answer) {
+  const q = document.getElementById(id);
+  const correct = tfExplanations[id].answer === answer;
+  const btns = q.querySelectorAll('.tf-btn');
+  btns.forEach(b => b.disabled = true);
+
+  const clickedBtn = q.querySelector(answer ? '.true-btn' : '.false-btn');
+  const result = document.getElementById(`${id}-result`);
+  result.classList.add('show');
+
+  if (correct) {
+    clickedBtn.classList.add('correct');
+    result.style.color = 'var(--r5)';
+    result.textContent = tfExplanations[id].correct;
+    tf4Done[['tf1','tf2','tf3','tf4'].indexOf(id)] = true;
+    if (tf4Done.every(Boolean)) {
+      setTimeout(() => unlockRoom(4,'LOCK 4 BROKEN','You understand digital permanency.','ENTER ROOM 5 →','#3b82f6'), 800);
+    }
+  } else {
+    clickedBtn.classList.add('wrong');
+    result.style.color = 'var(--r1)';
+    result.textContent = tfExplanations[id].wrong;
+    tf4HeartLost++;
+    if (tf4HeartLost <= 3) document.getElementById(`a4-${tf4HeartLost}`).classList.add('lost');
+    setTimeout(() => {
+      btns.forEach(b => { b.disabled = false; b.classList.remove('correct','wrong'); });
+      result.classList.remove('show');
+    }, 2500);
+  }
+}
+
+// ── ROOM 5 — SECURITY ──
+let r5HeartUsed = 0;
+function flagMsg(id) {
+  const isPhish = document.getElementById(id).dataset.phish === 'true';
+  const fb = document.getElementById('r5-fb');
+  if (isPhish) {
+    document.getElementById(id).classList.add('flagged-correct');
+    document.querySelectorAll('.message-card').forEach(m => {
+      if (m.id !== id) m.classList.add('safe-revealed');
+      m.querySelector('.msg-flag-btn').disabled = true;
+    });
+    fb.className = 'feedback show fb-good';
+    fb.textContent = '✓ Correct — that was the phishing attempt. Now identify WHY it\'s dangerous by clicking the red flags in the message below.';
+    setTimeout(() => {
+      document.getElementById('r5-phase1').style.display = 'none';
+      document.getElementById('r5-phase2').style.display = 'block';
+    }, 1200);
+  } else {
+    document.getElementById(id).classList.add('flagged-wrong');
+    fb.className = 'feedback show fb-bad';
+    fb.textContent = '✗ That one is legitimate. Look more carefully — check the sender address and the tone of the message.';
+    r5HeartUsed++;
+    setTimeout(() => {
+      document.getElementById(id).classList.remove('flagged-wrong');
+      fb.classList.remove('show');
+    }, 2000);
+  }
+}
+
+let rfFoundIds = new Set();
+function findRedFlag(id, explanation) {
+  if (rfFoundIds.has(id)) return;
+  rfFoundIds.add(id);
+  document.getElementById(id).classList.add('found');
+  rfFound++;
+  document.getElementById('rf-count').textContent = rfFound;
+  const fb = document.getElementById('r5p2-fb');
+  fb.className = 'feedback show fb-good';
+  fb.textContent = '🎯 ' + explanation;
+  if (rfFound === 5) {
+    setTimeout(() => unlockRoom(5,'LOCK 5 BROKEN','You can identify phishing attacks and their tactics.','ENTER ROOM 6 →','#10b981'), 1000);
+  }
+}
+
+// ── ROOM 6 — CYBERBULLYING ──
+let r6HeartLost = 0;
+let r6Completed = {};
+const r6DangerExplanations = {
+  dm2: '✓ RED FLAG — "Don\'t mention to your parents yet" is the single most documented grooming tactic. Legitimate talent scouts always involve parents. The secrecy request alone is enough to walk away and report.',
+  dm4: '✓ RED FLAG — Multiple warning signs: "I know you better than your friends," flattery, request to move off-platform ("not on here"), and offering to send something privately. These are textbook grooming patterns.',
+  dm5: '✓ RED FLAG — This is cyberbullying: anonymous account, public humiliation reference, telling someone to delete their account. Screenshot this, report the account, and tell a trusted adult.'
+};
+const r6SafeExplanations = {
+  dm1: '✓ SAFE — Normal peer communication asking about class notes.',
+  dm3: '✓ SAFE — Legitimate message from a coach about practice time.',
+  dm6: '✓ SAFE — Normal friendly message from a known contact.'
+};
+
+function dmAnswer(id, choice) {
+  if (r6Completed[id]) return;
+  const item = document.getElementById(id);
+  const isDanger = item.dataset.danger === 'true';
+  const isCorrect = (choice === 'danger' && isDanger) || (choice === 'safe' && !isDanger);
+
+  item.querySelectorAll('.dm-btn').forEach(b => b.disabled = true);
+  item.classList.add(choice === 'danger' ? 'marked-danger' : 'marked-safe');
+
+  const fb = document.getElementById('r6-fb');
+  if (isCorrect) {
+    r6Completed[id] = true;
+    fb.className = 'feedback show fb-good';
+    fb.textContent = isDanger ? r6DangerExplanations[id] : r6SafeExplanations[id];
+    if (Object.keys(r6Completed).length === 6) {
+      setTimeout(() => unlockRoom(6,'ALL LOCKS BROKEN','You can recognize online danger in real situations.','CLAIM YOUR ESCAPE →','#eab308'), 1200);
+    }
+  } else {
+    fb.className = 'feedback show fb-bad';
+    if (choice === 'danger' && !isDanger) {
+      fb.textContent = '✗ This one is safe — it\'s a normal message with no warning signs. Look for secrecy requests, flattery from strangers, urgency, or harassment.';
+    } else {
+      fb.textContent = '✗ Look again — this one contains a documented warning sign. Re-read it carefully.';
+    }
+    r6HeartLost++;
+    if (r6HeartLost <= 3) document.getElementById(`a6-${r6HeartLost}`).classList.add('lost');
+    setTimeout(() => {
+      item.querySelectorAll('.dm-btn').forEach(b => b.disabled = false);
+      item.classList.remove('marked-danger','marked-safe');
+      fb.classList.remove('show');
+    }, 2500);
+  }
+}
+
+// ── COMPLETION ──
+function submitEscape() {
+  const name = document.getElementById('ef-name').value.trim();
+  const period = document.getElementById('ef-period').value;
+  const hard = document.getElementById('ef-hard').value.trim();
+  const action = document.getElementById('ef-action').value.trim();
+  const err = document.getElementById('ef-err');
+  if (!name || !period || hard.length < 10 || action.length < 10) {
+    err.style.display = 'block'; return;
+  }
+  err.style.display = 'none';
+  document.getElementById('escape-form-inner').style.display = 'none';
+  document.getElementById('ef-success').classList.add('show');
+  document.getElementById('ef-confirm-name').textContent = `${name} · ${period} · Response recorded.`;
+}
+</script>
+</body>
+</html>
